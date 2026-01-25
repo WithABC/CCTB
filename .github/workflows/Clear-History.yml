@@ -1,0 +1,43 @@
+name: 清理历史记录
+permissions:
+  contents: write  # 需确保有强制推送主分支的权限
+  actions: write  # 需确保有删除工作流记录的权限
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  push:  # 允许提交触发
+
+jobs:
+  Clear-History:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 拉取仓库代码
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # 2. 清理 Git 历史记录
+      - name: 清理历史记录
+        run: |
+          # 配置 Git 身份
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # 创建无历史的新分支，替换主分支
+          git checkout --orphan new-branch  # 创建临时分支
+          git add -A  # 暂存所有当前文件
+          git commit -m "重置仓库历史记录" 
+          git branch -D main  # 删除原主分支
+          git branch -m main  # 将临时分支重命名为主分支
+          git push -f origin main  # 强制推送到远程
+          echo "Git 历史记录已成功清空并重置"
+
+      # 3. 清理工作流运行记录
+      - name: 清理历史工作流记录
+        if: always()
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # 自动生成的令牌
+          repository: ${{ github.repository }} # 当前仓库
+          retain_days: 0  # 不按天数保留
+          keep_minimum_runs: 2  # 保留最新2条工作流记录
